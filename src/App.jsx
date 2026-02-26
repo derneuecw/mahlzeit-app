@@ -149,10 +149,14 @@ function getWeekKey(offset = 0) {
 }
 
 function getWeekLabel(offset) {
-  if (offset === 0) return "Diese Woche";
-  if (offset === 1) return "Nächste Woche";
-  if (offset === -1) return "Letzte Woche";
-  return offset > 0 ? `+${offset} Wochen` : `${offset} Wochen`;
+  const d = new Date();
+  const day = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmt = (date) => date.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
+  return `${fmt(monday)} – ${fmt(sunday)}`;
 }
 
 function aggregateShopping(weekPlan, recipes) {
