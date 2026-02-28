@@ -515,12 +515,23 @@ export default function App() {
         </div>
 
         <div className="content">
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-            <div className="syncpill">
-              <span className={statusDotClass} />
-              {cloudStatus === "loading" ? "Sync…" : cloudStatus === "ok" ? "Cloud ✓" : "Cloud Fehler"}
-              <button className="btn-ghost" onClick={pullFromCloud} style={{ padding: 0, marginLeft: 8 }}>↻</button>
-            </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12 }}>
+  <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 12px" }} onClick={async () => {
+    if (!window.confirm("Alle Rezepte auf die 46 Standard-Rezepte zurücksetzen?")) return;
+    const current = cloudStateRef.current || {};
+    const next = { ...current, recipes: SAMPLES };
+    cloudStateRef.current = next;
+    await supabase.from("app_state").upsert({ id: STATE_ID, data: next });
+    setRecipes(SAMPLES);
+    storage.set("recipes", SAMPLES);
+    showToast("Rezepte zurückgesetzt ✓");
+  }}>⟳ Rezepte zurücksetzen</button>
+  <div className="syncpill">
+    <span className={statusDotClass} />
+    {cloudStatus === "loading" ? "Sync…" : cloudStatus === "ok" ? "Cloud ✓" : "Cloud Fehler"}
+    <button className="btn-ghost" onClick={pullFromCloud} style={{ padding: 0, marginLeft: 8 }}>↻</button>
+  </div>
+</div>
           </div>
 
           {tab === "planer" && (
