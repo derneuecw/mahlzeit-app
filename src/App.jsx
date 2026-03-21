@@ -875,9 +875,21 @@ Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
     setLoading(true);
     setError(null);
     try {
+      // Fetch page content via CORS proxy
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxyUrl);
+      const data = await res.json();
+      // Strip HTML tags to get plain text, limit length
+      const text = data.contents
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .slice(0, 8000);
+
       const recipe = await extractFromClaude([{
         role: "user",
-        content: `Extrahiere das Rezept von dieser URL: ${url}\n\nFalls du die Seite nicht abrufen kannst, extrahiere aus dem URL-Text was du kannst.`
+        content: `Extrahiere das Rezept aus diesem Webseiteninhalt:\n\n${text}`
       }]);
       setPreview(recipe);
     } catch (e) {
