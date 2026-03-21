@@ -714,6 +714,10 @@ export default function App() {
                   <div style={{ marginBottom: 12 }}>
                     <input className="search-bar" style={{ width: "100%" }} placeholder="🔍 Suchen…" value={search} onChange={(e) => setSearch(e.target.value)} />
                   </div>
+                  <button className="btn-primary" style={{ width: "100%", marginBottom: 12 }}
+                    onClick={() => setModal({ type: "quickAddRecipe", day: modal.day, slot: modal.slot })}>
+                    + Neues Rezept schnell hinzufügen
+                  </button>
                   <div className="recipe-picker">
                     {recipes.filter((r) => r.name.toLowerCase().includes(search.toLowerCase())).map((r) => (
                       <div key={r.id} className="picker-item" onClick={() => assignMeal(modal.day, modal.slot, r.id)}>
@@ -730,6 +734,17 @@ export default function App() {
                     ))}
                   </div>
                 </>
+              )}
+
+              {modal.type === "quickAddRecipe" && (
+                <QuickAddRecipe
+                  onSave={(recipe) => {
+                    const newRecipe = { ...recipe, id: uid() };
+                    setRecipes((prev) => [...prev, newRecipe]);
+                    assignMeal(modal.day, modal.slot, newRecipe.id);
+                  }}
+                  onClose={() => setModal(null)}
+                />
               )}
 
               {modal.type === "selectSlot" && (
@@ -803,6 +818,61 @@ function ViewRecipe({ recipe, onEdit, onDelete, onAssign, onClose }) {
         <button className="btn-primary" onClick={onEdit}>Bearbeiten</button>
         {onAssign && <button className="btn-secondary" onClick={onAssign}>Einplanen</button>}
         <button className="btn-ghost" onClick={onDelete} style={{ color: "#C04040", marginLeft: "auto" }}>Löschen</button>
+      </div>
+    </>
+  );
+}
+
+function QuickAddRecipe({ onSave, onClose }) {
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("Pasta");
+  const [healthy, setHealthy] = useState("Healthy");
+  const [duration, setDuration] = useState("Mid");
+
+  const handleSave = () => {
+    if (!name.trim()) return alert("Bitte einen Namen eingeben.");
+    onSave({ name, category, healthy, duration, servings: 2, prepTime: null, ingredients: [], notes: "" });
+  };
+
+  return (
+    <>
+      <div className="modal-header">
+        <div className="modal-title">Neues Rezept</div>
+        <button className="modal-close" onClick={onClose}>×</button>
+      </div>
+      <div className="form-group">
+        <label>Rezeptname *</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="z.B. Pasta Arrabiata" autoFocus />
+      </div>
+      <div className="form-row">
+        <div className="form-group">
+          <label>Kategorie</label>
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            {CATS.map((c) => <option key={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Healthy / Cheat</label>
+          <select value={healthy} onChange={(e) => setHealthy(e.target.value)}>
+            <option value="Healthy">🥗 Healthy</option>
+            <option value="Cheat">🍔 Cheat</option>
+          </select>
+        </div>
+      </div>
+      <div className="form-group">
+        <label>Dauer</label>
+        <select value={duration} onChange={(e) => setDuration(e.target.value)}>
+          <option value="Short">⚡ Short (&lt;20 Min)</option>
+          <option value="Mid">⏱ Mid (20–45 Min)</option>
+          <option value="Long">🕐 Long (&gt;45 Min)</option>
+        </select>
+      </div>
+      <p style={{ fontSize: 12, color: "#9A8A7A", marginBottom: 16 }}>
+        Zutaten kannst du später im Rezeptbuch ergänzen.
+      </p>
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <button className="btn-ghost" onClick={onClose}>Abbrechen</button>
+        <button className="btn-primary" onClick={handleSave}>Speichern & einplanen</button>
       </div>
     </>
   );
