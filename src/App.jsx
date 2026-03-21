@@ -875,6 +875,21 @@ Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
     setLoading(true);
     setError(null);
     try {
+      // Try to fetch page content via corsproxy.io
+      let text = "";
+      try {
+        const proxyRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
+        const html = await proxyRes.text();
+        text = html
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .slice(0, 8000);
+      } catch (e) {
+        text = `URL: ${url}`;
+      }
+
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -884,26 +899,24 @@ Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
           "anthropic-dangerous-direct-browser-access": "true",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-6",
+          model: "claude-haiku-4-5-20251001",
           max_tokens: 1000,
-          system: `Du bist ein Assistent der Rezepte aus Webseiten extrahiert.
+          system: `Du bist ein Assistent der Rezepte aus Webseiteninhalt extrahiert.
 Antworte NUR mit einem JSON-Objekt, kein Markdown, keine Erklärung.
 Format: {"name":"...","category":"Pasta|Fleisch|Fisch|Vegetarisch|Vegan|Suppe|Salat|Auflauf|Sonstiges","healthy":"Healthy|Cheat","duration":"Short|Mid|Long","servings":2,"prepTime":30,"ingredients":[{"name":"...","amount":100,"unit":"g"}],"notes":"..."}
 Healthy = wenig Weißmehl/Zucker, viel Gemüse. Cheat = Pasta, Pizza, Burger etc.
-Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
-          tools: [{ type: "web_search_20250305", name: "web_search" }],
+Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.
+Falls du kein vollständiges Rezept findest, extrahiere so viel wie möglich aus dem Text.`,
           messages: [{
             role: "user",
-            content: `Rufe diese URL ab und extrahiere das Rezept daraus: ${url}`
+            content: `Extrahiere das Rezept aus diesem Webseiteninhalt:\n\n${text}`
           }],
         }),
       });
       const data = await res.json();
       console.log("Claude response:", JSON.stringify(data, null, 2));
-      // Find the last text block in the response
       const textBlock = [...(data.content || [])].reverse().find(b => b.type === "text");
       if (!textBlock) throw new Error("Keine Antwort von Claude");
-      // Extract JSON from response - find the {...} block
       const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("Kein Rezept gefunden in: " + textBlock.text.slice(0, 100));
       const recipe = JSON.parse(jsonMatch[0]);
