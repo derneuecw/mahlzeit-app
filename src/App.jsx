@@ -855,7 +855,7 @@ function ImportRecipe({ onSave, onClose }) {
         "anthropic-dangerous-direct-browser-access": "true",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-5",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 1000,
         system: `Du bist ein Assistent der Rezepte aus Text oder Bildern extrahiert.
 Antworte NUR mit einem JSON-Objekt, kein Markdown, keine Erklärung.
@@ -884,7 +884,7 @@ Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
           "anthropic-dangerous-direct-browser-access": "true",
         },
         body: JSON.stringify({
-          model: "claude-opus-4-5",
+          model: "claude-haiku-4-5-20251001",
           max_tokens: 1000,
           system: `Du bist ein Assistent der Rezepte aus Webseiten extrahiert.
 Antworte NUR mit einem JSON-Objekt, kein Markdown, keine Erklärung.
