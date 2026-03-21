@@ -903,7 +903,10 @@ Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
       // Find the last text block in the response
       const textBlock = [...(data.content || [])].reverse().find(b => b.type === "text");
       if (!textBlock) throw new Error("Keine Antwort von Claude");
-      const recipe = JSON.parse(textBlock.text.replace(/```json|```/g, "").trim());
+      // Extract JSON from response - find the {...} block
+      const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("Kein Rezept gefunden in: " + textBlock.text.slice(0, 100));
+      const recipe = JSON.parse(jsonMatch[0]);
       setPreview(recipe);
     } catch (e) {
       setError("Fehler: " + e.message);
