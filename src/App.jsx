@@ -590,9 +590,14 @@ export default function App() {
                   <h2 className="section-title">Rezeptbuch</h2>
                   <p className="section-sub">{filteredRecipes.length} von {recipes.length} Rezepten</p>
                 </div>
-                <button className="btn-primary" onClick={() => setModal({ type: "editRecipe", recipe: null })}>
-                  + Neues Rezept
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="btn-secondary" onClick={() => setModal({ type: "importRecipe" })}>
+                    🔗 Importieren
+                  </button>
+                  <button className="btn-primary" onClick={() => setModal({ type: "editRecipe", recipe: null })}>
+                    + Neues Rezept
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
@@ -736,6 +741,13 @@ export default function App() {
                 </>
               )}
 
+              {modal.type === "importRecipe" && (
+                <ImportRecipe
+                  onSave={saveRecipe}
+                  onClose={() => setModal(null)}
+                />
+              )}
+
               {modal.type === "quickAddRecipe" && (
                 <QuickAddRecipe
                   onSave={(recipe) => {
@@ -819,6 +831,167 @@ function ViewRecipe({ recipe, onEdit, onDelete, onAssign, onClose }) {
         {onAssign && <button className="btn-secondary" onClick={onAssign}>Einplanen</button>}
         <button className="btn-ghost" onClick={onDelete} style={{ color: "#C04040", marginLeft: "auto" }}>Löschen</button>
       </div>
+    </>
+  );
+}
+
+function ImportRecipe({ onSave, onClose }) {
+  const [mode, setMode] = useState(null); // "url" | "photo"
+  const [url, setUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [error, setError] = useState(null);
+  const fileRef = useRef(null);
+
+  const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_KEY;
+
+  const extractFromClaude = async (messages) => {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_KEY,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: "claude-opus-4-5",
+        max_tokens: 1000,
+        system: `Du bist ein Assistent der Rezepte aus Text oder Bildern extrahiert.
+Antworte NUR mit einem JSON-Objekt, kein Markdown, keine Erklärung.
+Format: {"name":"...","category":"Pasta|Fleisch|Fisch|Vegetarisch|Vegan|Suppe|Salat|Auflauf|Sonstiges","healthy":"Healthy|Cheat","duration":"Short|Mid|Long","servings":2,"prepTime":30,"ingredients":[{"name":"...","amount":100,"unit":"g"}],"notes":"..."}
+Healthy = wenig Weißmehl/Zucker, viel Gemüse. Cheat = Pasta, Pizza, Burger etc.
+Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
+        messages,
+      }),
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text || "";
+    return JSON.parse(text.replace(/```json|```/g, "").trim());
+  };
+
+  const handleUrl = async () => {
+    if (!url.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const recipe = await extractFromClaude([{
+        role: "user",
+        content: `Extrahiere das Rezept von dieser URL: ${url}\n\nFalls du die Seite nicht abrufen kannst, extrahiere aus dem URL-Text was du kannst.`
+      }]);
+      setPreview(recipe);
+    } catch (e) {
+      setError("Konnte Rezept nicht extrahieren. Versuch es mit einem Foto.");
+    }
+    setLoading(false);
+  };
+
+  const handlePhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result.split(",")[1]);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const recipe = await extractFromClaude([{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: file.type, data: base64 } },
+          { type: "text", text: "Extrahiere das Rezept aus diesem Bild." }
+        ]
+      }]);
+      setPreview(recipe);
+    } catch (e) {
+      setError("Konnte Rezept nicht lesen. Versuch ein klareres Foto.");
+    }
+    setLoading(false);
+  };
+
+  if (preview) {
+    return (
+      <>
+        <div className="modal-header">
+          <div className="modal-title">Rezept prüfen</div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div style={{ background: "#F0F5F0", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, marginBottom: 8 }}>{preview.name}</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+            <span className="label-healthy" style={{ background: preview.healthy === "Healthy" ? "#E8F5E9" : "#FFF3E0", color: preview.healthy === "Healthy" ? "#2E7D32" : "#E65100" }}>
+              {preview.healthy === "Healthy" ? "🥗 Healthy" : "🍔 Cheat"}
+            </span>
+            <span className="label-mid">{preview.duration === "Short" ? "⚡ Short" : preview.duration === "Mid" ? "⏱ Mid" : "🕐 Long"}</span>
+            <span style={{ fontSize: 12, color: "#7A6A5A" }}>{preview.category} · 👥 {preview.servings} · ⏱ {preview.prepTime} Min</span>
+          </div>
+          <div style={{ fontSize: 13, color: "#5A4A3A" }}>
+            {preview.ingredients?.slice(0, 5).map((ing, i) => (
+              <span key={i}>{ing.name}{i < Math.min(4, preview.ingredients.length - 1) ? ", " : preview.ingredients.length > 5 ? "…" : ""}</span>
+            ))}
+          </div>
+        </div>
+        <p style={{ fontSize: 12, color: "#9A8A7A", marginBottom: 16 }}>Zutaten und Details kannst du später im Rezeptbuch anpassen.</p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button className="btn-ghost" onClick={() => setPreview(null)}>← Zurück</button>
+          <button className="btn-primary" onClick={() => { onSave(preview); }}>Rezept speichern ✓</button>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="modal-header">
+        <div className="modal-title">Rezept importieren</div>
+        <button className="modal-close" onClick={onClose}>×</button>
+      </div>
+
+      {!mode && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <button className="btn-primary" style={{ padding: 20, fontSize: 16 }} onClick={() => setMode("url")}>
+            🔗 Von Website (URL)
+          </button>
+          <button className="btn-secondary" style={{ padding: 20, fontSize: 16 }} onClick={() => setMode("photo")}>
+            📷 Foto vom Rezeptbuch
+          </button>
+        </div>
+      )}
+
+      {mode === "url" && !loading && (
+        <>
+          <p style={{ color: "#7A6A5A", fontSize: 14, marginBottom: 12 }}>Rezept-URL eingeben (z.B. von Chefkoch, Lecker, etc.)</p>
+          <input className="search-bar" style={{ width: "100%", marginBottom: 12 }} placeholder="https://www.chefkoch.de/rezepte/..." value={url} onChange={(e) => setUrl(e.target.value)} />
+          {error && <p style={{ color: "#C04040", fontSize: 13, marginBottom: 12 }}>{error}</p>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button className="btn-ghost" onClick={() => setMode(null)}>← Zurück</button>
+            <button className="btn-primary" onClick={handleUrl}>Importieren</button>
+          </div>
+        </>
+      )}
+
+      {mode === "photo" && !loading && (
+        <>
+          <p style={{ color: "#7A6A5A", fontSize: 14, marginBottom: 12 }}>Mach ein Foto vom Rezept oder lade ein Bild hoch.</p>
+          {error && <p style={{ color: "#C04040", fontSize: 13, marginBottom: 12 }}>{error}</p>}
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhoto} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button className="btn-primary" style={{ padding: 16 }} onClick={() => fileRef.current?.click()}>📷 Foto aufnehmen / Bild wählen</button>
+            <button className="btn-ghost" onClick={() => setMode(null)}>← Zurück</button>
+          </div>
+        </>
+      )}
+
+      {loading && (
+        <div style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>✨</div>
+          <p style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, color: "#2C2416" }}>Claude liest das Rezept…</p>
+          <p style={{ fontSize: 13, color: "#9A8A7A", marginTop: 8 }}>Einen Moment bitte</p>
+        </div>
+      )}
     </>
   );
 }
