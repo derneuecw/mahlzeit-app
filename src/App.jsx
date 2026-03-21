@@ -899,6 +899,7 @@ Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
         }),
       });
       const data = await res.json();
+      console.log("Claude response:", JSON.stringify(data, null, 2));
       // Find the last text block in the response
       const textBlock = [...(data.content || [])].reverse().find(b => b.type === "text");
       if (!textBlock) throw new Error("Keine Antwort von Claude");
