@@ -875,22 +875,34 @@ Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
     setLoading(true);
     setError(null);
     try {
-      // Fetch page content via CORS proxy
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-      const res = await fetch(proxyUrl);
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-opus-4-5",
+          max_tokens: 1000,
+          system: `Du bist ein Assistent der Rezepte aus Webseiten extrahiert.
+Antworte NUR mit einem JSON-Objekt, kein Markdown, keine Erklärung.
+Format: {"name":"...","category":"Pasta|Fleisch|Fisch|Vegetarisch|Vegan|Suppe|Salat|Auflauf|Sonstiges","healthy":"Healthy|Cheat","duration":"Short|Mid|Long","servings":2,"prepTime":30,"ingredients":[{"name":"...","amount":100,"unit":"g"}],"notes":"..."}
+Healthy = wenig Weißmehl/Zucker, viel Gemüse. Cheat = Pasta, Pizza, Burger etc.
+Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
+          tools: [{ type: "web_search_20250305", name: "web_search" }],
+          messages: [{
+            role: "user",
+            content: `Rufe diese URL ab und extrahiere das Rezept daraus: ${url}`
+          }],
+        }),
+      });
       const data = await res.json();
-      // Strip HTML tags to get plain text, limit length
-      const text = data.contents
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/\s+/g, " ")
-        .slice(0, 8000);
-
-      const recipe = await extractFromClaude([{
-        role: "user",
-        content: `Extrahiere das Rezept aus diesem Webseiteninhalt:\n\n${text}`
-      }]);
+      // Find the last text block in the response
+      const textBlock = [...(data.content || [])].reverse().find(b => b.type === "text");
+      if (!textBlock) throw new Error("Keine Antwort von Claude");
+      const recipe = JSON.parse(textBlock.text.replace(/```json|```/g, "").trim());
       setPreview(recipe);
     } catch (e) {
       setError("Fehler: " + e.message);
