@@ -875,21 +875,6 @@ Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
     setLoading(true);
     setError(null);
     try {
-      // Try to fetch page content via corsproxy.io
-      let text = "";
-      try {
-        const proxyRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-        const html = await proxyRes.text();
-        text = html
-          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-          .replace(/<[^>]+>/g, " ")
-          .replace(/\s+/g, " ")
-          .slice(0, 8000);
-      } catch (e) {
-        text = `URL: ${url}`;
-      }
-
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -899,27 +884,41 @@ Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
           "anthropic-dangerous-direct-browser-access": "true",
         },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 1000,
-          system: `Du bist ein Assistent der Rezepte aus Webseiteninhalt extrahiert.
+          model: "claude-sonnet-4-6",
+          max_tokens: 1500,
+          system: `Du bist ein Assistent der Rezepte aus Webseiten extrahiert.
+Rufe die URL ab und extrahiere das Rezept.
 Antworte NUR mit einem JSON-Objekt, kein Markdown, keine Erklärung.
 Format: {"name":"...","category":"Pasta|Fleisch|Fisch|Vegetarisch|Vegan|Suppe|Salat|Auflauf|Sonstiges","healthy":"Healthy|Cheat","duration":"Short|Mid|Long","servings":2,"prepTime":30,"ingredients":[{"name":"...","amount":100,"unit":"g"}],"notes":"..."}
 Healthy = wenig Weißmehl/Zucker, viel Gemüse. Cheat = Pasta, Pizza, Burger etc.
-Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.
-Falls du kein vollständiges Rezept findest, extrahiere so viel wie möglich aus dem Text.`,
-          messages: [{
-            role: "user",
-            content: `Extrahiere das Rezept aus diesem Webseiteninhalt:\n\n${text}`
-          }],
+Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
+          tools: [{ type: "web_search_20250305", name: "web_search" }],
+          messages: [{ role: "user", content: `Rufe diese Rezept-URL ab und extrahiere das vollständige Rezept daraus als JSON: ${url}` }],
         }),
       });
       const data = await res.json();
-      console.log("Claude response:", JSON.stringify(data, null, 2));
       const textBlock = [...(data.content || [])].reverse().find(b => b.type === "text");
       if (!textBlock) throw new Error("Keine Antwort von Claude");
       const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("Kein Rezept gefunden in: " + textBlock.text.slice(0, 100));
+      if (!jsonMatch) throw new Error("Kein Rezept gefunden. Versuch den Text-Import.");
       const recipe = JSON.parse(jsonMatch[0]);
+      if (!recipe.name || recipe.name === "Nicht verfügbar") throw new Error("Rezept nicht lesbar. Versuch den Text-Import.");
+      setPreview(recipe);
+    } catch (e) {
+      setError("Fehler: " + e.message);
+    }
+    setLoading(false);
+  };
+
+  const handleText = async (pastedText) => {
+    if (!pastedText.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const recipe = await extractFromClaude([{
+        role: "user",
+        content: `Extrahiere das Rezept aus diesem Text:\n\n${pastedText.slice(0, 6000)}`
+      }]);
       setPreview(recipe);
     } catch (e) {
       setError("Fehler: " + e.message);
@@ -996,10 +995,30 @@ Falls du kein vollständiges Rezept findest, extrahiere so viel wie möglich aus
           <button className="btn-primary" style={{ padding: 20, fontSize: 16 }} onClick={() => setMode("url")}>
             🔗 Von Website (URL)
           </button>
+          <button className="btn-secondary" style={{ padding: 20, fontSize: 16 }} onClick={() => setMode("text")}>
+            📋 Text einfügen
+          </button>
           <button className="btn-secondary" style={{ padding: 20, fontSize: 16 }} onClick={() => setMode("photo")}>
             📷 Foto vom Rezeptbuch
           </button>
         </div>
+      )}
+
+      {mode === "text" && !loading && (
+        <>
+          <p style={{ color: "#7A6A5A", fontSize: 14, marginBottom: 12 }}>Rezepttext einfügen – z.B. von Chefkoch, TikTok Beschreibung, etc.</p>
+          <textarea
+            style={{ width: "100%", minHeight: 160, border: "1.5px solid #E0D4C4", borderRadius: 10, padding: "10px 14px", fontFamily: "'DM Sans',sans-serif", fontSize: 13, outline: "none", resize: "vertical" }}
+            placeholder="Hier den kopierten Rezepttext einfügen…"
+            onChange={(e) => e.target.value.length > 20 && null}
+            id="paste-area"
+          />
+          {error && <p style={{ color: "#C04040", fontSize: 13, marginTop: 8 }}>{error}</p>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 12 }}>
+            <button className="btn-ghost" onClick={() => setMode(null)}>← Zurück</button>
+            <button className="btn-primary" onClick={() => handleText(document.getElementById("paste-area").value)}>Rezept extrahieren</button>
+          </div>
+        </>
       )}
 
       {mode === "url" && !loading && (
