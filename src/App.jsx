@@ -893,7 +893,7 @@ Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
       }]);
       setPreview(recipe);
     } catch (e) {
-      setError("Konnte Rezept nicht extrahieren. Versuch es mit einem Foto.");
+      setError("Fehler: " + e.message);
     }
     setLoading(false);
   };
