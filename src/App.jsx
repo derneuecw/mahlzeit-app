@@ -547,15 +547,9 @@ export default function App() {
                   </div>
                   <div className="suggest-chips">
                     {suggestions.map((r) => (
-                      <div key={r.id} className="suggest-chip" onClick={() => setModal({ type: "selectSlot", recipe: r })}
-                        style={{ display: "flex", flexDirection: "column", gap: 4, padding: "8px 14px", borderRadius: 12, cursor: "pointer" }}>
-                        <span style={{ fontWeight: 600, fontSize: 13 }}>{r.name}</span>
-                        <div style={{ display: "flex", gap: 4 }}>
-                          <span style={{ fontSize: 10, color: "#5C7A5F", fontWeight: 700, textTransform: "uppercase" }}>{r.category}</span>
-                          {r.healthy && <span style={{ fontSize: 10, fontWeight: 700, color: r.healthy === "Healthy" ? "#2E7D32" : "#E65100" }}>· {r.healthy === "Healthy" ? "🥗" : "🍔"}</span>}
-                          {r.duration && <span style={{ fontSize: 10, color: "#9A8A7A" }}>· {r.duration === "Short" ? "⚡" : r.duration === "Mid" ? "⏱" : "🕐"}</span>}
-                        </div>
-                      </div>
+                      <span key={r.id} className="suggest-chip" onClick={() => setModal({ type: "selectSlot", recipe: r })}>
+                        {r.name}
+                      </span>
                     ))}
                   </div>
                 </div>
