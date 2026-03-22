@@ -298,13 +298,36 @@ const css = `
   .week-label { font-family:'Playfair Display',serif; font-size:16px; color:#2C2416; }
   .btn-week { background:#fff; border:1.5px solid #E0D4C4; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:16px; color:#7A6A5A; transition:all .2s; }
   .btn-week:hover { border-color:#C4622D; color:#C4622D; }
-  .toast { position:fixed; bottom:24px; right:24px; background:#2C2416; color:#E8A87C; padding:12px 20px; border-radius:12px; font-size:14px; font-weight:500; z-index:300; animation:fadeIn .3s; font-family:'DM Sans',sans-serif; }
+  .toast { position:fixed; bottom:80px; right:16px; background:#2C2416; color:#E8A87C; padding:12px 20px; border-radius:12px; font-size:14px; font-weight:500; z-index:300; animation:fadeIn .3s; font-family:'DM Sans',sans-serif; }
   .syncpill { display:inline-flex; align-items:center; gap:8px; background:#fff; border:1.5px solid #E0D4C4; border-radius:999px; padding:6px 12px; font-size:12px; color:#7A6A5A; }
   .dot { width:8px; height:8px; border-radius:999px; background:#D4C4B4; display:inline-block; }
   .dot.ok { background:#5C7A5F; }
   .dot.bad { background:#C04040; }
-  @media(max-width:768px) { .week-grid { grid-template-columns:repeat(2,1fr); } .form-row { grid-template-columns:1fr; } .ing-row { grid-template-columns:1fr 70px 90px 28px; } }
-  @media(max-width:480px) { .week-grid { grid-template-columns:1fr; } .content { padding:16px; } .header { padding:14px 16px 0; } }
+  .bottom-nav { display:none; }
+  @media(max-width:768px) {
+    .week-grid { grid-template-columns:repeat(2,1fr); }
+    .form-row { grid-template-columns:1fr; }
+    .ing-row { grid-template-columns:1fr 70px 90px 28px; }
+  }
+  @media(max-width:480px) {
+    .week-grid { grid-template-columns:1fr; }
+    .content { padding:12px 12px 90px; }
+    .header { padding:10px 16px 0; }
+    .header-top { margin-bottom:0; }
+    .tabs { display:none; }
+    .search-bar { width:100%; }
+    .bottom-nav { display:flex; position:fixed; bottom:0; left:0; right:0; background:#2C2416; padding:8px 0 20px; z-index:100; justify-content:space-around; }
+    .bottom-nav-btn { display:flex; flex-direction:column; align-items:center; gap:3px; background:none; border:none; color:#9A8A7A; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:10px; font-weight:500; padding:4px 20px; }
+    .bottom-nav-btn.active { color:#E8A87C; }
+    .bottom-nav-btn .nav-icon { font-size:22px; }
+    .day-card { display:grid; grid-template-columns:80px 1fr 1fr; gap:10px; align-items:center; border-radius:12px; padding:12px 14px; }
+    .day-name { font-size:15px; margin-bottom:0; }
+    .meal-label { font-size:9px; }
+    .week-nav { margin-bottom:12px; }
+    .suggest-bar { padding:12px; }
+    .toolbar { gap:8px; }
+    .section-sub { margin-bottom:12px; }
+  }
 `;
 
 export default function App() {
@@ -785,6 +808,16 @@ export default function App() {
         )}
 
         {toast && <div className="toast">{toast}</div>}
+
+        {/* Bottom Navigation für Mobile */}
+        <div className="bottom-nav">
+          {[["planer","📅","Planer"],["rezepte","🍽️","Rezepte"],["einkauf","🛒","Einkauf"]].map(([t,icon,label]) => (
+            <button key={t} className={`bottom-nav-btn ${tab===t?"active":""}`} onClick={() => setTab(t)}>
+              <span className="nav-icon">{icon}</span>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
     </>
   );
