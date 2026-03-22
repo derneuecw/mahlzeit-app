@@ -398,8 +398,8 @@ export default function App() {
   useEffect(() => {
     const used = new Set(Object.values(weekPlan).flatMap((d) => Object.values(d)));
     const unused = recipes.filter((r) => !used.has(r.id));
-    const pool = unused.length >= 3 ? unused : recipes;
-    setSuggestions([...pool].sort(() => Math.random() - 0.5).slice(0, 4));
+    const pool = unused.length >= 6 ? unused : recipes;
+    setSuggestions([...pool].sort(() => Math.random() - 0.5).slice(0, 6));
   }, [recipes, weekPlan]);
 
   /** Save to local + cloud (debounced) whenever state changes */
@@ -536,20 +536,28 @@ export default function App() {
 
               {suggestions.length > 0 && (
                 <div className="suggest-bar">
-                  <span className="suggest-label">💡 Vorschläge</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 10 }}>
+                    <span className="suggest-label">💡 Vorschläge</span>
+                    <button className="btn-refresh" onClick={() => {
+                      const used = new Set(Object.values(weekPlan).flatMap((d) => Object.values(d)));
+                      const pool = recipes.filter((r) => !used.has(r.id));
+                      const base = pool.length >= 6 ? pool : recipes;
+                      setSuggestions([...base].sort(() => Math.random() - 0.5).slice(0, 6));
+                    }}>↻ Neue</button>
+                  </div>
                   <div className="suggest-chips">
                     {suggestions.map((r) => (
-                      <span key={r.id} className="suggest-chip" onClick={() => setModal({ type: "selectSlot", recipe: r })}>
-                        {r.name}
-                      </span>
+                      <div key={r.id} className="suggest-chip" onClick={() => setModal({ type: "selectSlot", recipe: r })}
+                        style={{ display: "flex", flexDirection: "column", gap: 4, padding: "8px 14px", borderRadius: 12, cursor: "pointer" }}>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>{r.name}</span>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          <span style={{ fontSize: 10, color: "#5C7A5F", fontWeight: 700, textTransform: "uppercase" }}>{r.category}</span>
+                          {r.healthy && <span style={{ fontSize: 10, fontWeight: 700, color: r.healthy === "Healthy" ? "#2E7D32" : "#E65100" }}>· {r.healthy === "Healthy" ? "🥗" : "🍔"}</span>}
+                          {r.duration && <span style={{ fontSize: 10, color: "#9A8A7A" }}>· {r.duration === "Short" ? "⚡" : r.duration === "Mid" ? "⏱" : "🕐"}</span>}
+                        </div>
+                      </div>
                     ))}
                   </div>
-                  <button className="btn-refresh" onClick={() => {
-                    const used = new Set(Object.values(weekPlan).flatMap((d) => Object.values(d)));
-                    const pool = recipes.filter((r) => !used.has(r.id));
-                    const base = pool.length >= 4 ? pool : recipes;
-                    setSuggestions([...base].sort(() => Math.random() - 0.5).slice(0, 4));
-                  }}>↻ Neue</button>
                 </div>
               )}
 
@@ -836,8 +844,7 @@ function ViewRecipe({ recipe, onEdit, onDelete, onAssign, onClose }) {
 }
 
 function ImportRecipe({ onSave, onClose }) {
-  const [mode, setMode] = useState(null); // "url" | "photo"
-  const [url, setUrl] = useState("");
+  const [mode, setMode] = useState(null); // "text" | "photo"
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState(null);
@@ -868,46 +875,6 @@ Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
     const data = await res.json();
     const text = data.content?.[0]?.text || "";
     return JSON.parse(text.replace(/```json|```/g, "").trim());
-  };
-
-  const handleUrl = async () => {
-    if (!url.trim()) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": ANTHROPIC_KEY,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1500,
-          system: `Du bist ein Assistent der Rezepte aus Webseiten extrahiert.
-Rufe die URL ab und extrahiere das Rezept.
-Antworte NUR mit einem JSON-Objekt, kein Markdown, keine Erklärung.
-Format: {"name":"...","category":"Pasta|Fleisch|Fisch|Vegetarisch|Vegan|Suppe|Salat|Auflauf|Sonstiges","healthy":"Healthy|Cheat","duration":"Short|Mid|Long","servings":2,"prepTime":30,"ingredients":[{"name":"...","amount":100,"unit":"g"}],"notes":"..."}
-Healthy = wenig Weißmehl/Zucker, viel Gemüse. Cheat = Pasta, Pizza, Burger etc.
-Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
-          tools: [{ type: "web_search_20250305", name: "web_search" }],
-          messages: [{ role: "user", content: `Rufe diese Rezept-URL ab und extrahiere das vollständige Rezept daraus als JSON: ${url}` }],
-        }),
-      });
-      const data = await res.json();
-      const textBlock = [...(data.content || [])].reverse().find(b => b.type === "text");
-      if (!textBlock) throw new Error("Keine Antwort von Claude");
-      const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("Kein Rezept gefunden. Versuch den Text-Import.");
-      const recipe = JSON.parse(jsonMatch[0]);
-      if (!recipe.name || recipe.name === "Nicht verfügbar") throw new Error("Rezept nicht lesbar. Versuch den Text-Import.");
-      setPreview(recipe);
-    } catch (e) {
-      setError("Fehler: " + e.message);
-    }
-    setLoading(false);
   };
 
   const handleText = async (pastedText) => {
@@ -992,10 +959,7 @@ Short = unter 20 Min, Mid = 20-45 Min, Long = über 45 Min.`,
 
       {!mode && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <button className="btn-primary" style={{ padding: 20, fontSize: 16 }} onClick={() => setMode("url")}>
-            🔗 Von Website (URL)
-          </button>
-          <button className="btn-secondary" style={{ padding: 20, fontSize: 16 }} onClick={() => setMode("text")}>
+          <button className="btn-primary" style={{ padding: 20, fontSize: 16 }} onClick={() => setMode("text")}>
             📋 Text einfügen
           </button>
           <button className="btn-secondary" style={{ padding: 20, fontSize: 16 }} onClick={() => setMode("photo")}>
